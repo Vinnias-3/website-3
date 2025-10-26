@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HustleHub — Daily Hustle Tracker</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#00d4a6; --danger:#ff6b6b;
+    --glass: rgba(255,255,255,0.03);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071021 0%, #07131b 60%);color:#e6eef8}
+  .app{max-width:1000px;margin:24px auto;padding:20px}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+  .logo{display:flex;gap:12px;align-items:center}
+  .logo .mark{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#2dd4bf);display:flex;align-items:center;justify-content:center;color:#00221a;font-weight:700;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,0.5)}
+  h1{margin:0;font-size:20px}
+  .meta{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 360px;gap:16px;margin-top:18px}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}.sidebar{order:2}}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,select,button,textarea{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:10px;border-radius:8px;color:inherit;font-size:14px;outline:none}
+  input::placeholder{color:var(--muted)}
+  .hustle-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .hustle-item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+  .hustle-item.active{background:linear-gradient(90deg,rgba(0,212,166,0.08), rgba(45,212,191,0.03));border:1px solid rgba(0,212,166,0.16)}
+  .hustle-name{font-weight:600}
+  .small{font-size:13px;color:var(--muted)}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .entries{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+  .entry{display:flex;justify-content:space-between;gap:8px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+  .entry .left{display:flex;flex-direction:column}
+  .tag{padding:4px 8px;border-radius:999px;font-weight:700;font-size:12px}
+  .tag.in{background:rgba(4,120,87,0.14);color:#71f2d6;border:1px solid rgba(4,120,87,0.12)}
+  .tag.out{background:rgba(191,54,12,0.08);color:#ffb0a6;border:1px solid rgba(191,54,12,0.08)}
+  .totals{display:flex;gap:10px;align-items:center;margin-top:12px}
+  .total-card{flex:1;padding:10px;border-radius:10px;background:var(--glass);text-align:center}
+  .big{font-size:18px;font-weight:700}
+  canvas{width:100%;height:140px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));display:block}
+  .tips{margin-top:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));padding:10px;border-radius:10px;font-size:13px;color:var(--muted)}
+  .btn{background:linear-gradient(90deg,var(--accent),#2dd4bf);border:none;color:#00221a;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+  .muted-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 10px}
+  .footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+  /* nice micro animations */
+  .hustle-item:hover{transform:translateY(-4px);transition:transform .18s}
+  .btn:active{transform:translateY(1px)}
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <div class="mark">HH</div>
+        <div>
+          <h1>HustleHub</h1>
+          <div class="meta">Track daily hustles • Save profit • Plan smarter</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="themeToggle" class="muted-btn">Toggle Theme</button>
+        <button id="export" class="muted-btn">Export Data</button>
+        <button id="clearAll" class="muted-btn">Reset</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Main -->
+      <main class="card main">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div>
+            <strong id="selectedHustleTitle">Select or create a hustle</strong>
+            <div class="small" id="selectedHustleSub">No hustle selected</div>
+          </div>
+          <div class="small">Today: <span id="todayDate"></span></div>
+        </div>
+
+        <!-- Add Hustle -->
+        <section style="margin-top:12px">
+          <form id="hustleForm" onsubmit="return false;" style="display:flex;gap:8px">
+            <input id="hustleName" placeholder="Add new hustle (e.g., Mitumba, Boda, Freelance)" required>
+            <button id="addHustleBtn" class="btn">Add Hustle</button>
+          </form>
+          <div class="hustle-list" id="hustleList" aria-live="polite"></div>
+        </section>
+
+        <!-- Entry form -->
+        <section style="margin-top:14px" id="entrySection" hidden>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="entryType"><option value="income">Income</option><option value="expense">Expense</option></select>
+            <input id="entryAmt" placeholder="Amount (KES)" inputmode="numeric" required>
+            <input id="entryNote" placeholder="Note (e.g., 'sold 2 shirts')" >
+            <input id="entryDate" type="date">
+            <button id="addEntryBtn" class="btn">Add Entry</button>
+          </div>
+
+          <div class="totals" id="totalsWrap" style="margin-top:12px">
+            <div class="total-card">
+              <div class="small">Today</div>
+              <div class="big" id="todayTotal">Ksh 0</div>
+            </div>
+            <div class="total-card">
+              <div class="small">7-day</div>
+              <div class="big" id="weekTotal">Ksh 0</div>
+            </div>
+            <div class="total-card">
+              <div class="small">All time</div>
+              <div class="big" id="allTotal">Ksh 0</div>
+            </div>
+          </div>
+
+          <canvas id="weekChart"></canvas>
+
+          <div class="entries" id="entriesList" aria-live="polite"></div>
+        </section>
+      </main>
+
+      <!-- Sidebar -->
+      <aside class="card sidebar">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>Quick Hustle Tips</strong>
+            <div class="small">Short, actionable ideas</div>
+          </div>
+        </div>
+
+        <div class="tips" id="tipBox">Start by adding a hustle. Tip will appear here.</div>
+
+        <div style="margin-top:12px">
+          <strong>My Hustles</strong>
+          <div class="small">Tap to select & start logging</div>
+          <div id="miniHustleList" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>Quick Actions</strong>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button id="quickIncome" class="muted-btn">+ Income (Ksh 100)</button>
+            <button id="quickExpense" class="muted-btn">- Expense (Ksh 50)</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>About</strong>
+          <div class="small">Built for Kenyan hustlers — simple, offline-first, and mobile-friendly.</div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div class="small">Presentation tips: demo adding entries, show weekly chart, explain localStorage and benefits.</div>
+        <div><small class="small">Made with ❤️ — HustleHub</small></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* HustleHub v1 — single-file app
+   Features:
+   - multiple hustles
+   - entries (income/expense) with date and note
+   - totals: today, 7-day, all-time
+   - weekly bar chart (last 7 days)
+   - localStorage persistence
+*/
+
+// Utilities
+const $ = id => document.getElementById(id);
+const money = n => {
+  const num = Number(n)||0;
+  return num.toLocaleString('en-KE',{style:'currency',currency:'KES',maximumFractionDigits:0});
+};
+const dateISO = (d=new Date()) => {
+  const iso = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString();
+  return iso.split('T')[0];
+};
+
+// State
+let state = {
+  hustles: [], // {id,name,entries: [{type,amount,date,note,id}]}
+  selected: null
+};
+
+const STORAGE_KEY = 'hustlehub_v1';
+
+// DOM refs
+const todayDate = $('todayDate');
+const hustleList = $('hustleList');
+const miniHustleList = $('miniHustleList');
+const selectedHustleTitle = $('selectedHustleTitle');
+const selectedHustleSub = $('selectedHustleSub');
+const entrySection = $('entrySection');
+const entryType = $('entryType');
+const entryAmt = $('entryAmt');
+const entryNote = $('entryNote');
+const entryDate = $('entryDate');
+const addEntryBtn = $('addEntryBtn');
+const entriesList = $('entriesList');
+const todayTotal = $('todayTotal');
+const weekTotal = $('weekTotal');
+const allTotal = $('allTotal');
+const weekChart = $('weekChart').getContext('2d');
+const tipBox = $('tipBox');
+const exportBtn = $('export');
+const clearAllBtn = $('clearAll');
+const hustleForm = $('hustleForm');
+const hustleName = $('hustleName');
+const addHustleBtn = $('addHustleBtn');
+const themeToggle = $('themeToggle');
+const quickIncome = $('quickIncome');
+const quickExpense = $('quickExpense');
+
+// Init
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw){
+    try { state = JSON.parse(raw); }
+    catch(e){ state = {hustles:[],selected:null}; }
+  }
+  if(state.hustles.length && !state.selected) state.selected = state.hustles[0].id;
+  updateDate();
+  renderAll();
+}
+function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+// Helpers
+function uid(prefix='id'){ return prefix + Math.random().toString(36).slice(2,9); }
+function findHustle(id){ return state.hustles.find(h=>h.id===id); }
+function formatShort(d){ const dt = new Date(d); return dt.toLocaleDateString(); }
+
+// Date display
+function updateDate(){ todayDate.textContent = new Date().toLocaleDateString(); entryDate.value = dateISO(); }
+
+// Render
+function renderAll(){
+  renderHustles();
+  renderMiniList();
+  renderSelected();
+  save();
+}
+function renderHustles(){
+  hustleList.innerHTML = '';
+  if(state.hustles.length === 0){
+    hustleList.innerHTML = '<div class="small" style="padding:10px">No hustles yet — add one to start tracking.</div>';
+    return;
+  }
+  state.hustles.forEach(h=>{
+    const el = document.createElement('div');
+    el.className = 'hustle-item' + (state.selected===h.id?' active':'');
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:10px">
+      <div style="width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#062a26,#083039);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700">${h.name.slice(0,2).toUpperCase()}</div>
+      <div>
+        <div class="hustle-name">${h.name}</div>
+        <div class="small">${h.entries ? h.entries.length : 0} entries</div>
+      </div>
+    </div>`;
+    el.onclick = () => { state.selected = h.id; renderAll(); };
+    hustleList.appendChild(el);
+  });
+}
+function renderMiniList(){
+  miniHustleList.innerHTML = '';
+  state.hustles.forEach(h=>{
+    const el = document.createElement('div');
+    el.className = 'hustle-item' + (state.selected===h.id?' active':'');
+    el.style.padding = '8px';
+    el.style.fontSize = '14px';
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="min-width:0"><strong>${h.name}</strong><div class="small">${h.entries? h.entries.length:0} entries</div></div>
+      <div class="small">${calcAll(h).toLocaleString('en-KE')}</div>
+    </div>`;
+    el.onclick = () => { state.selected = h.id; renderAll(); window.scrollTo({top:0,behavior:'smooth'}); };
+    miniHustleList.appendChild(el);
+  });
+}
+
+// Selected hustle UI
+function renderSelected(){
+  const selected = findHustle(state.selected);
+  if(!selected){
+    selectedHustleTitle.textContent = 'Select or create a hustle';
+    selectedHustleSub.textContent = 'No hustle selected';
+    entrySection.hidden = true;
+    entriesList.innerHTML = '';
+    todayTotal.textContent = 'Ksh 0';
+    weekTotal.textContent = 'Ksh 0';
+    allTotal.textContent = 'Ksh 0';
+    drawChart([]);
+    return;
+  }
+  entrySection.hidden = false;
+  selectedHustleTitle.textContent = selected.name;
+  selectedHustleSub.textContent = `${selected.entries ? selected.entries.length : 0} entries recorded`;
+  renderEntries(selected);
+  renderTotals(selected);
+  const weekData = getLast7(selected);
+  drawChart(weekData);
+}
+
+// Entries rendering
+function renderEntries(h){
+  entriesList.innerHTML = '';
+  if(!h.entries || h.entries.length===0){
+    entriesList.innerHTML = '<div class="small">No entries yet — add income or expense to get started.</div>';
+    return;
+  }
+  // sort by date desc
+  const sorted = [...h.entries].sort((a,b)=> new Date(b.date) - new Date(a.date));
+  sorted.forEach(e=>{
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.innerHTML = `<div class="left">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="tag ${e.type==='income'?'in':'out'}">${e.type==='income'?'IN':'OUT'}</div>
+          <div><strong>${money(e.amount)}</strong></div>
+        </div>
+        <div class="small">${e.note || ''} • ${formatShort(e.date)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <button class="muted-btn" style="font-size:12px" onclick="deleteEntry('${h.id}','${e.id}')">Delete</button>
+      </div>`;
+    entriesList.appendChild(div);
+  });
+}
+
+// Totals
+function calcAll(h){
+  if(!h.entries) return 0;
+  return h.entries.reduce((s,e)=> e.type==='income' ? s + Number(e.amount||0) : s - Number(e.amount||0), 0);
+}
+function calcToday(h){
+  const today = dateISO();
+  if(!h.entries) return 0;
+  return h.entries.filter(e=> e.date===today ).reduce((s,e)=> e.type==='income' ? s + Number(e.amount||0) : s - Number(e.amount||0), 0);
+}
+function calc7Days(h){
+  const msDay = 24*60*60*1000;
+  const today = new Date(dateISO());
+  const start = new Date(today.getTime() - 6*msDay); // 7 days including today
+  if(!h.entries) return 0;
+  return h.entries.filter(e => new Date(e.date) >= start )
+    .reduce((s,e)=> e.type==='income' ? s + Number(e.amount||0) : s - Number(e.amount||0), 0);
+}
+function renderTotals(h){
+  todayTotal.textContent = money(calcToday(h));
+  weekTotal.textContent = money(calc7Days(h));
+  allTotal.textContent = money(calcAll(h));
+}
+
+// Chart: simple last 7 days [returns array of {label, value}]
+function getLast7(h){
+  const msDay = 24*60*60*1000;
+  const today = new Date(dateISO());
+  const data = [];
+  for(let i=6;i>=0;i--){
+    const dt = new Date(today.getTime() - i*msDay);
+    const iso = dateISO(dt);
+    const val = h.entries ? h.entries.filter(e=> e.date===iso )
+        .reduce((s,e)=> e.type==='income' ? s + Number(e.amount||0) : s - Number(e.amount||0), 0) : 0;
+    data.push({label: dt.toLocaleDateString(undefined,{month:'short',day:'numeric'}), value: val});
+  }
+  return data;
+}
+function drawChart(data){
+  const c = weekChart.canvas;
+  // resize for crispness
+  const DPR = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * DPR;
+  c.height = c.clientHeight * DPR;
+  weekChart.scale(DPR, DPR);
+  weekChart.clearRect(0,0,c.clientWidth,c.clientHeight);
+
+  // axes
+  const w = c.clientWidth, h = c.clientHeight;
+  const pad = 12;
+  const max = Math.max(1, ...data.map(d=>Math.abs(d.value)));
+  const barW = (w - pad*2) / (data.length*1.5);
+
+  data.forEach((d,i)=>{
+    const x = pad + i*(barW*1.5);
+    const val = d.value;
+    const heightPercent = Math.min(1, Math.abs(val) / max);
+    const barH = (h - pad*4) * heightPercent;
+    const y = val >=0 ? (h - pad - barH) : (h - pad);
+    // color gradient
+    weekChart.fillStyle = val>=0 ? 'rgba(4,120,87,0.85)' : 'rgba(191,54,12,0.85)';
+    weekChart.fillRect(x, y, barW, barH);
+    // label
+    weekChart.fillStyle = 'rgba(255,255,255,0.85)';
+    weekChart.font = '11px system-ui';
+    weekChart.fillText(d.label, x, h - pad + 12);
+  });
+}
+
+// Actions
+function addHustle(name){
+  const id = uid('h');
+  state.hustles.push({id,name,entries:[]});
+  state.selected = id;
+  renderAll();
+}
+function addEntry(){
+  const h = findHustle(state.selected);
+  if(!h) return alert('Select a hustle first');
+  const amt = Number(entryAmt.value || 0);
+  if(!amt || isNaN(amt)) return alert('Enter valid amount');
+  const type = entryType.value;
+  const date = entryDate.value || dateISO();
+  const entry = {id: uid('e'), type, amount: Math.abs(amt), note: entryNote.value || '', date};
+  h.entries = h.entries || [];
+  h.entries.push(entry);
+  entryAmt.value = ''; entryNote.value = ''; entryDate.value = dateISO();
+  renderAll();
+  showTipRandom();
+}
+function deleteEntry(hId,eId){
+  const h = findHustle(hId);
+  if(!h) return;
+  h.entries = h.entries.filter(e=> e.id!==eId);
+  renderAll();
+}
+
+// Quick actions
+function quickAdd(amount, type){
+  if(!state.selected) return alert('Select a hustle first.');
+  entryAmt.value = String(amount);
+  entryType.value = type;
+  entryDate.value = dateISO();
+  entryNote.value = type==='income' ? 'Quick income' : 'Quick expense';
+  addEntry();
+}
+
+// Tips
+const TIPS = [
+  'Record every shilling — the small amounts matter.',
+  'Start a savings goal: put aside Ksh 50 daily.',
+  'Bundle purchases to reduce transport costs.',
+  'Use local markets for cheaper stock sourcing.',
+  'Offer discounts for repeat customers.',
+  'Keep a simple daily routine for faster turnover.'
+];
+function showTipRandom(){
+  tipBox.textContent = TIPS[Math.floor(Math.random()*TIPS.length)];
+}
+
+// Export & Reset
+function exportData(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'hustlehub_data.json'; document.body.appendChild(a); a.click();
+  a.remove(); URL.revokeObjectURL(url);
+}
+function resetAll(){
+  if(!confirm('Reset all HustleHub data? This will erase everything.')) return;
+  state = {hustles:[],selected:null};
+  save();
+  renderAll();
+}
+
+// Event handlers
+addHustleBtn.onclick = ()=> {
+  const name = hustleName.value.trim();
+  if(!name) return;
+  addHustle(name);
+  hustleName.value = '';
+};
+$('hustleForm').onsubmit = (e)=> { e.preventDefault(); addHustleBtn.onclick(); };
+
+addEntryBtn.onclick = addEntry;
+exportBtn.onclick = exportData;
+clearAllBtn.onclick = resetAll;
+quickIncome.onclick = ()=> quickAdd(100,'income');
+quickExpense.onclick = ()=> quickAdd(50,'expense');
+
+themeToggle.onclick = ()=> {
+  // simple theme invert
+  const body = document.body;
+  if(body.style.filter==='invert(1) hue-rotate(180deg)') body.style.filter = '';
+  else body.style.filter = 'invert(1) hue-rotate(180deg)';
+};
+
+// init sample data (for demo) only if empty — helpful for presentation
+function seedDemo(){
+  if(state.hustles.length>0) return;
+  addHustle('Mitumba');
+  addEntryTo('hustle-legacy','income',1000,'Sold 5 shirts','2025-10-18');
+}
+function ensureDemo(){
+  if(state.hustles.length===0){
+    state.hustles.push({id:uid('h'), name:'Mitumba', entries:[
+      {id:uid('e'), type:'income', amount:1200, date:dateISO(new Date(Date.now()-2*24*3600)), note:'Bulk sale'},
+      {id:uid('e'), type:'expense', amount:200, date:dateISO(new Date(Date.now()-1*24*3600)), note:'Transport'},
+      {id:uid('e'), type:'income', amount:800, date:dateISO(), note:'Retail sale'}
+    ]});
+    state.selected = state.hustles[0].id;
+  }
+}
+function addEntryTo(hId,type,amount,note,date){
+  const h = findHustle(hId);
+  if(!h) return;
+  h.entries.push({id:uid('e'), type, amount, note, date});
+}
+
+// start
+load();
+if(!state.hustles.length) ensureDemo();
+renderAll();
+showTipRandom();
+
+</script>
+</body>
+</html>
